@@ -2,38 +2,33 @@ import { AuthProvider } from './context/AuthProvider'
 import { useAuth } from './hooks/useAuth'
 import { AuthView } from './components/auth/AuthView'
 import { HomeView } from './components/HomeView'
+import { isSupabaseConfigured } from './lib/supabase'
+import './components/auth/auth.css'
 
 function MainContent() {
   const { user, loading, isRecoveryMode } = useAuth()
 
-  if (loading) {
+  if (!isSupabaseConfigured) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <p style={{ color: 'var(--text)' }}>Cargando sesión...</p>
-      </div>
+      <main className="auth-container">
+        <h1>Acceso no disponible</h1>
+        <p role="alert">El acceso a las cuentas no está disponible en este momento. Inténtalo más tarde.</p>
+      </main>
     )
   }
 
-  // Si el usuario está en modo recuperación de contraseña, mostramos AuthView (con el formulario de nueva clave)
-  if (isRecoveryMode) {
-    return <AuthView />
+  if (loading) {
+    return <main className="session-loading" role="status">Cargando sesión…</main>
   }
 
-  // Si hay un usuario autenticado, mostramos la vista principal
-  if (user) {
-    return <HomeView />
+  if (isRecoveryMode || !user) {
+    // Un enlace de recuperación abre un formulario nuevo, sin contraseñas anteriores.
+    return <AuthView key={isRecoveryMode ? 'recovery' : 'access'} />
   }
 
-  // Si no está autenticado, mostramos el login / registro
-  return <AuthView />
+  return <HomeView />
 }
 
-function App() {
-  return (
-    <AuthProvider>
-      <MainContent />
-    </AuthProvider>
-  )
+export default function App() {
+  return <AuthProvider><MainContent /></AuthProvider>
 }
-
-export default App

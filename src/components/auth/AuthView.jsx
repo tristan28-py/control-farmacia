@@ -1,367 +1,185 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import './auth.css'
+import { getAuthErrorMessage, MIN_PASSWORD_LENGTH } from '../../lib/authMessages'
+
+const titles = {
+  login: 'Iniciar sesión',
+  register: 'Crear cuenta',
+  forgot: 'Recuperar contraseña',
+  recovery: 'Nueva contraseña',
+}
+const actions = {
+  login: ['Iniciar sesión', 'Iniciando sesión…'],
+  register: ['Crear cuenta', 'Creando cuenta…'],
+  forgot: ['Enviar enlace de recuperación', 'Enviando…'],
+  recovery: ['Guardar nueva contraseña', 'Guardando…'],
+}
 
 export function AuthView() {
   const {
-    signIn,
-    signUp,
-    resetPassword,
-    updatePassword,
-    isRecoveryMode,
-    setIsRecoveryMode,
+    signIn, signUp, resetPassword, updatePassword, signOut,
+    isRecoveryMode, finishRecovery, authError, clearAuthError,
   } = useAuth()
-
-  // Modos de vista: 'login' | 'register' | 'forgot' | 'recovery'
-  const [mode, setMode] = useState(isRecoveryMode ? 'recovery' : 'login')
-
-  // Campos de formulario
+  const [selectedMode, setSelectedMode] = useState('login')
+  const mode = isRecoveryMode ? 'recovery' : selectedMode
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
-
-  // Estados de control
-  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const requestPending = useRef(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+  const [passwordUpdated, setPasswordUpdated] = useState(false)
+  const createsPassword = mode === 'register' || mode === 'recovery'
 
-  // Limpiar mensajes y estados al cambiar de modo
-  const changeMode = (newMode) => {
-    setMode(newMode)
+  function changeMode(nextMode) {
+    if (requestPending.current) return
+    setSelectedMode(nextMode)
     setErrorMsg('')
     setSuccessMsg('')
+    clearAuthError()
     setPassword('')
     setConfirmPassword('')
   }
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
+  async function handleSubmit(event) {
+    event.preventDefault()
+    if (requestPending.current) return
     setErrorMsg('')
     setSuccessMsg('')
-    setLoading(true)
+    clearAuthError()
 
-    try {
-      const { error } = await signIn(email, password)
-      if (error) {
-        setErrorMsg(error.message || 'Credenciales inválidas')
-      }
-    } catch (err) {
-      setErrorMsg('Error inesperado al iniciar sesión: ' + err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleRegister = async (e) => {
-    e.preventDefault()
-    setErrorMsg('')
-    setSuccessMsg('')
-
-    if (password.length < 6) {
-      setErrorMsg('La contraseña debe tener al menos 6 caracteres.')
+    if (createsPassword && password.length < MIN_PASSWORD_LENGTH) {
+      setErrorMsg(`Usa al menos ${MIN_PASSWORD_LENGTH} caracteres para la contraseña.`)
       return
     }
-
-    if (password !== confirmPassword) {
+    if (createsPassword && password !== confirmPassword) {
       setErrorMsg('Las contraseñas no coinciden.')
       return
     }
 
-    setLoading(true)
-
+    requestPending.current = true
+    setBusy(true)
     try {
-      const { data, error } = await signUp(email, password, {
-        full_name: fullName.trim(),
-      })
+      let result
+      if (mode === 'login') result = await signIn(email, password)
+      if (mode === 'register') result = await signUp(email, password, { full_name: fullName.trim() })
+      if (mode === 'forgot') result = await resetPassword(email)
+      if (mode === 'recovery') result = await updatePassword(password)
+      if (result.error) throw result.error
 
-      if (error) {
-        setErrorMsg(error.message)
-      } else {
-        // En Supabase, si la confirmación por correo está habilitada, data.session es null
-        if (!data.session) {
-          setSuccessMsg(
-            '¡Registro exitoso! Por favor revisa tu bandeja de correo para confirmar tu cuenta.'
-          )
-        } else {
-          setSuccessMsg('¡Registro exitoso! Iniciando sesión...')
-        }
+      setPassword('')
+      setConfirmPassword('')
+      if (mode === 'register' && !result.data.session) {
+        setSuccessMsg('Revisa tu correo para confirmar la cuenta. Si ya tienes una, puedes iniciar sesión o recuperar tu contraseña.')
       }
-    } catch (err) {
-      setErrorMsg('Error al registrar usuario: ' + err.message)
+      if (mode === 'forgot') {
+        setSuccessMsg('Si existe una cuenta con ese correo, recibirás un enlace para recuperar el acceso. Revisa también la carpeta de spam.')
+      }
+      if (mode === 'recovery') {
+        setPasswordUpdated(true)
+        setSuccessMsg('Tu contraseña se actualizó correctamente.')
+      }
+    } catch (error) {
+      setErrorMsg(getAuthErrorMessage(error))
     } finally {
-      setLoading(false)
+      requestPending.current = false
+      setBusy(false)
     }
   }
 
-  const handleForgotPassword = async (e) => {
-    e.preventDefault()
+  async function cancelRecovery() {
+    if (requestPending.current) return
+    requestPending.current = true
+    setBusy(true)
     setErrorMsg('')
-    setSuccessMsg('')
-    setLoading(true)
-
     try {
-      const { error } = await resetPassword(email)
-      if (error) {
-        setErrorMsg(error.message)
-      } else {
-        setSuccessMsg(
-          'Se ha enviado un enlace de recuperación a tu correo electrónico.'
-        )
-      }
-    } catch (err) {
-      setErrorMsg('Error al solicitar recuperación: ' + err.message)
+      const { error } = await signOut()
+      if (error) throw error
+    } catch (error) {
+      setErrorMsg(getAuthErrorMessage(error))
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleUpdatePassword = async (e) => {
-    e.preventDefault()
-    setErrorMsg('')
-    setSuccessMsg('')
-
-    if (password.length < 6) {
-      setErrorMsg('La nueva contraseña debe tener al menos 6 caracteres.')
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setErrorMsg('Las contraseñas no coinciden.')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const { error } = await updatePassword(password)
-      if (error) {
-        setErrorMsg(error.message)
-      } else {
-        setSuccessMsg('¡Contraseña actualizada exitosamente!')
-        setTimeout(() => {
-          setIsRecoveryMode(false)
-          changeMode('login')
-        }, 2000)
-      }
-    } catch (err) {
-      setErrorMsg('Error al actualizar la contraseña: ' + err.message)
-    } finally {
-      setLoading(false)
+      requestPending.current = false
+      setBusy(false)
     }
   }
 
   return (
-    <div className="auth-container">
-      <div className="auth-header">
-        <h2>Control Farmacia</h2>
-        <p>
-          {mode === 'login' && 'Ingresa tus credenciales para continuar'}
-          {mode === 'register' && 'Crea tu cuenta de control personal'}
-          {mode === 'forgot' && 'Recupera el acceso a tu cuenta'}
-          {mode === 'recovery' && 'Ingresa tu nueva contraseña'}
-        </p>
-      </div>
+    <main className="auth-container">
+      <header className="auth-header">
+        <p className="auth-brand">Control Farmacia</p>
+        <h1>{passwordUpdated ? 'Contraseña actualizada' : titles[mode]}</h1>
+        <p>{mode === 'forgot' ? 'Te enviaremos un enlace para elegir una nueva contraseña.' :
+          mode === 'recovery' ? 'Elige una contraseña que no uses en otras cuentas.' :
+          'Tu espacio para el control personal de tus tratamientos.'}</p>
+      </header>
 
-      {errorMsg && <div className="auth-alert auth-alert-error">{errorMsg}</div>}
-      {successMsg && (
-        <div className="auth-alert auth-alert-success">{successMsg}</div>
+      {(errorMsg || authError) && (
+        <div className="auth-alert auth-alert-error" role="alert">{errorMsg || authError}</div>
       )}
+      {successMsg && <div className="auth-alert auth-alert-success" role="status">{successMsg}</div>}
 
-      {/* FORMULARIO: LOGIN */}
-      {mode === 'login' && !isRecoveryMode && (
-        <form onSubmit={handleLogin} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="email">Correo Electrónico</label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tu@correo.com"
-              autoComplete="email"
-            />
-          </div>
+      {passwordUpdated ? (
+        <button className="btn-primary" type="button" onClick={finishRecovery}>Continuar a mi cuenta</button>
+      ) : (
+        <form onSubmit={handleSubmit} aria-label={titles[mode]} aria-busy={busy}>
+          <fieldset className="auth-form" disabled={busy}>
+            <legend className="sr-only">{titles[mode]}</legend>
+            {mode === 'register' && (
+              <div className="form-group">
+                <label htmlFor="full-name">Nombre (opcional)</label>
+                <input id="full-name" name="fullName" autoComplete="name" maxLength={100}
+                  value={fullName} onChange={(event) => setFullName(event.target.value)} />
+              </div>
+            )}
 
-          <div className="form-group">
-            <label htmlFor="password">Contraseña</label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-            />
-          </div>
+            {mode !== 'recovery' && (
+              <div className="form-group">
+                <label htmlFor="email">Correo electrónico</label>
+                <input id="email" name="email" type="email" required autoComplete="email"
+                  autoCapitalize="none" spellCheck={false} placeholder="tu@correo.com"
+                  value={email} onChange={(event) => setEmail(event.target.value)} />
+              </div>
+            )}
 
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-          </button>
+            {mode !== 'forgot' && (
+              <div className="form-group">
+                <label htmlFor="password">{mode === 'recovery' ? 'Nueva contraseña' : 'Contraseña'}</label>
+                <input id="password" name="password" type="password" required
+                  autoComplete={createsPassword ? 'new-password' : 'current-password'}
+                  aria-describedby={createsPassword ? 'password-hint' : undefined}
+                  value={password} onChange={(event) => setPassword(event.target.value)} />
+                {createsPassword && <p id="password-hint" className="form-hint">Al menos {MIN_PASSWORD_LENGTH} caracteres. Usa una contraseña larga y única.</p>}
+              </div>
+            )}
 
-          <div className="auth-footer">
-            <button
-              type="button"
-              className="auth-link"
-              onClick={() => changeMode('forgot')}
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
-            <span>
-              ¿No tienes una cuenta?{' '}
-              <button
-                type="button"
-                className="auth-link"
-                onClick={() => changeMode('register')}
-              >
-                Regístrate
-              </button>
-            </span>
-          </div>
+            {createsPassword && (
+              <div className="form-group">
+                <label htmlFor="confirm-password">Confirmar contraseña</label>
+                <input id="confirm-password" name="confirmPassword" type="password" required
+                  autoComplete="new-password" value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)} />
+              </div>
+            )}
+
+            <button type="submit" className="btn-primary">{actions[mode][busy ? 1 : 0]}</button>
+
+            <nav className="auth-footer" aria-label="Opciones de acceso">
+              {mode === 'login' ? (
+                <>
+                  <button type="button" className="auth-link" onClick={() => changeMode('forgot')}>¿Olvidaste tu contraseña?</button>
+                  <span>¿No tienes cuenta? <button type="button" className="auth-link" onClick={() => changeMode('register')}>Crear cuenta</button></span>
+                </>
+              ) : mode === 'recovery' ? (
+                <button type="button" className="auth-link" onClick={cancelRecovery}>Cancelar y cerrar sesión</button>
+              ) : (
+                <button type="button" className="auth-link" onClick={() => changeMode('login')}>Volver a iniciar sesión</button>
+              )}
+            </nav>
+          </fieldset>
         </form>
       )}
-
-      {/* FORMULARIO: REGISTRO */}
-      {mode === 'register' && !isRecoveryMode && (
-        <form onSubmit={handleRegister} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="reg-name">Nombre Completo</label>
-            <input
-              id="reg-name"
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Tu nombre"
-              autoComplete="name"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="reg-email">Correo Electrónico</label>
-            <input
-              id="reg-email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tu@correo.com"
-              autoComplete="email"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="reg-password">Contraseña</label>
-            <input
-              id="reg-password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
-              autoComplete="new-password"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="reg-confirm">Confirmar Contraseña</label>
-            <input
-              id="reg-confirm"
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repite la contraseña"
-              autoComplete="new-password"
-            />
-          </div>
-
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
-          </button>
-
-          <div className="auth-footer">
-            <span>
-              ¿Ya tienes una cuenta?{' '}
-              <button
-                type="button"
-                className="auth-link"
-                onClick={() => changeMode('login')}
-              >
-                Inicia Sesión
-              </button>
-            </span>
-          </div>
-        </form>
-      )}
-
-      {/* FORMULARIO: RECUPERAR CONTRASEÑA */}
-      {mode === 'forgot' && !isRecoveryMode && (
-        <form onSubmit={handleForgotPassword} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="forgot-email">Correo Electrónico</label>
-            <input
-              id="forgot-email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tu@correo.com"
-              autoComplete="email"
-            />
-          </div>
-
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
-          </button>
-
-          <div className="auth-footer">
-            <button
-              type="button"
-              className="auth-link"
-              onClick={() => changeMode('login')}
-            >
-              Volver a Iniciar Sesión
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* FORMULARIO: NUEVA CONTRASEÑA (RECOVERY MODE) */}
-      {(mode === 'recovery' || isRecoveryMode) && (
-        <form onSubmit={handleUpdatePassword} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="new-password">Nueva Contraseña</label>
-            <input
-              id="new-password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
-              autoComplete="new-password"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="confirm-new-password">Confirmar Nueva Contraseña</label>
-            <input
-              id="confirm-new-password"
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repite la nueva contraseña"
-              autoComplete="new-password"
-            />
-          </div>
-
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Guardando...' : 'Establecer Nueva Contraseña'}
-          </button>
-        </form>
-      )}
-    </div>
+    </main>
   )
 }

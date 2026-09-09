@@ -1,106 +1,118 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { authRedirect, supabase } from '../lib/supabase'
+import { getAuthErrorMessage } from '../lib/authMessages'
+import { getAuthRedirectUrl, setRecoveryLocation } from '../lib/authRedirect'
 import { AuthContext } from './AuthContext'
 
+const invalidLinkMessage = 'El enlace no es válido o venció. Solicita un correo nuevo.'
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
   const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(Boolean(supabase))
   const [isRecoveryMode, setIsRecoveryMode] = useState(false)
+  const [authError, setAuthError] = useState(authRedirect.error ? invalidLinkMessage : '')
 
   useEffect(() => {
-    // 1. Obtener la sesión activa al montar el componente (persistencia)
-    async function getInitialSession() {
-      try {
-        const { data, error } = await supabase.auth.getSession()
-        if (error) {
-          console.error('Error al obtener sesión inicial:', error.message)
-        } else {
-          setSession(data.session)
-          setUser(data.session?.user ?? null)
-        }
-      } catch (err) {
-        console.error('Error inesperado al inicializar auth:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
+    if (!supabase) return
+    let active = true
 
-    getInitialSession()
-
-    // 2. Escuchar cambios de estado en tiempo real (login, logout, token refresh, password recovery)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, newSession) => {
-      setSession(newSession)
-      setUser(newSession?.user ?? null)
+    // INITIAL_SESSION también restaura la sesión: evitamos dos lecturas que compitan.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!active) return
+      setSession(nextSession)
       setLoading(false)
 
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveryMode(true)
-      } else if (event === 'USER_UPDATED' || event === 'SIGNED_OUT') {
+        setAuthError('')
+        setRecoveryLocation(true)
+      } else if (event === 'INITIAL_SESSION' && authRedirect.recovery && !authRedirect.error) {
+        setIsRecoveryMode(Boolean(nextSession))
+        setRecoveryLocation(Boolean(nextSession))
+        if (!nextSession) setAuthError(invalidLinkMessage)
+      } else if (event === 'SIGNED_OUT') {
         setIsRecoveryMode(false)
+        setRecoveryLocation(false)
+      } else if (event === 'INITIAL_SESSION' && authRedirect.error) {
+        setRecoveryLocation(false)
+      }
+      // USER_UPDATED no termina la recuperación: primero mostramos la confirmación.
+    })
+
+    // initialize() reutiliza la inicialización y permite mostrar sus errores.
+    supabase.auth.initialize().then(({ error }) => {
+      if (active && error) {
+        setAuthError(authRedirect.recovery || authRedirect.error
+          ? invalidLinkMessage : getAuthErrorMessage(error))
+        setIsRecoveryMode(false)
+        setRecoveryLocation(false)
+        setLoading(false)
+      }
+    }).catch((error) => {
+      if (active) {
+        setAuthError(getAuthErrorMessage(error))
+        setLoading(false)
       }
     })
 
-    // Limpieza al desmontar
     return () => {
+      active = false
       subscription.unsubscribe()
     }
   }, [])
 
-  // Métodos de autenticación
-  const signUp = async (email, password, metadata = {}) => {
-    return await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: metadata,
-      },
-    })
-  }
+  const signUp = (email, password, metadata = {}) => supabase.auth.signUp({
+    email: email.trim(),
+    password,
+    options: { data: metadata, emailRedirectTo: getAuthRedirectUrl() },
+  })
 
-  const signIn = async (email, password) => {
-    return await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-  }
+  const signIn = (email, password) => supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  })
 
   const signOut = async () => {
-    const res = await supabase.auth.signOut()
-    setIsRecoveryMode(false)
-    return res
-  }
-
-  const resetPassword = async (email) => {
-    return await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    })
-  }
-
-  const updatePassword = async (newPassword) => {
-    const res = await supabase.auth.updateUser({
-      password: newPassword,
-    })
-    if (!res.error) {
-      setIsRecoveryMode(false)
+    try {
+      const result = await supabase.auth.signOut({ scope: 'local' })
+      // Supabase puede cerrar la sesión local incluso si la petición remota falla.
+      if (result.error) {
+        setAuthError('No pudimos confirmar el cierre con el servidor. ' + getAuthErrorMessage(result.error))
+      }
+      return result
+    } catch (error) {
+      setAuthError(getAuthErrorMessage(error))
+      throw error
     }
-    return res
   }
 
-  const value = {
-    user,
-    session,
-    loading,
-    isRecoveryMode,
-    setIsRecoveryMode,
-    signUp,
-    signIn,
-    signOut,
-    resetPassword,
-    updatePassword,
+  const resetPassword = (email) => supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: getAuthRedirectUrl(true),
+  })
+
+  const updatePassword = (password) => supabase.auth.updateUser({ password })
+
+  const finishRecovery = () => {
+    setRecoveryLocation(false)
+    setIsRecoveryMode(false)
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{
+      user: session?.user ?? null,
+      session,
+      loading,
+      isRecoveryMode,
+      authError,
+      clearAuthError: () => setAuthError(''),
+      signUp,
+      signIn,
+      signOut,
+      resetPassword,
+      updatePassword,
+      finishRecovery,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }

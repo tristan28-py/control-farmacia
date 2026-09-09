@@ -1,113 +1,54 @@
+import { useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { getAuthErrorMessage } from '../lib/authMessages'
 
 export function HomeView() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, authError } = useAuth()
+  const [busy, setBusy] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const requestPending = useRef(false)
+  const displayName = user?.user_metadata?.full_name?.trim() || user?.email?.split('@')[0] || 'Usuario'
 
-  const displayName =
-    user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario'
+  async function handleSignOut() {
+    if (requestPending.current) return
+    requestPending.current = true
+    setBusy(true)
+    setErrorMsg('')
+    try {
+      const { error } = await signOut()
+      if (error) throw error
+    } catch (error) {
+      setErrorMsg(getAuthErrorMessage(error))
+    } finally {
+      requestPending.current = false
+      setBusy(false)
+    }
+  }
 
   return (
-    <div
-      style={{
-        maxWidth: '680px',
-        margin: '40px auto',
-        padding: '24px',
-        textAlign: 'left',
-      }}
-    >
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderBottom: '1px solid var(--border)',
-          paddingBottom: '16px',
-          marginBottom: '24px',
-        }}
-      >
+    <main className="account-container">
+      <header className="account-header">
         <div>
-          <h2 style={{ margin: 0, color: 'var(--text-h)' }}>
-            ¡Hola, {displayName}! 👋
-          </h2>
-          <p style={{ margin: '4px 0 0', fontSize: '14px', color: 'var(--text)' }}>
-            Sesión iniciada como <strong>{user?.email}</strong>
-          </p>
+          <p className="auth-brand">Control Farmacia</p>
+          <h1>Hola, {displayName}</h1>
         </div>
-        <button
-          onClick={signOut}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: 'transparent',
-            border: '1px solid var(--border)',
-            borderRadius: '6px',
-            color: 'var(--text-h)',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
-        >
-          Cerrar Sesión
+        <button type="button" className="btn-secondary" onClick={handleSignOut} disabled={busy}>
+          {busy ? 'Cerrando sesión…' : 'Cerrar sesión'}
         </button>
       </header>
-
-      <section
-        style={{
-          background: 'var(--accent-bg)',
-          border: '1px solid var(--accent-border)',
-          borderRadius: '8px',
-          padding: '16px 20px',
-          marginBottom: '24px',
-        }}
-      >
-        <h3 style={{ margin: '0 0 8px', color: 'var(--accent)' }}>
-          ✅ Fase 1 Completada: Autenticación y Persistencia
-        </h3>
-        <p style={{ fontSize: '14px', color: 'var(--text-h)', margin: 0 }}>
-          Tu sesión está activa y persistirá aunque recargues la página. Supabase
-          Auth está gestionando de forma segura los tokens en el navegador.
-        </p>
+      {(errorMsg || authError) && (
+        <p className="auth-alert auth-alert-error" role="alert">{errorMsg || authError}</p>
+      )}
+      <section className="account-details" aria-labelledby="account-title">
+        <h2 id="account-title">Tu cuenta</h2>
+        <p>Has iniciado sesión. Puedes cerrar esta página y volver a acceder desde este navegador.</p>
+        <dl>
+          <dt>Correo electrónico</dt>
+          <dd>{user?.email}</dd>
+          <dt>Correo confirmado</dt>
+          <dd>{user?.email_confirmed_at ? 'Sí' : 'Pendiente de confirmación'}</dd>
+        </dl>
       </section>
-
-      <div
-        style={{
-          background: 'var(--bg)',
-          border: '1px solid var(--border)',
-          borderRadius: '8px',
-          padding: '20px',
-        }}
-      >
-        <h4 style={{ margin: '0 0 12px', color: 'var(--text-h)' }}>
-          Detalles de la Cuenta
-        </h4>
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-            fontSize: '14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}
-        >
-          <li>
-            <strong>ID de Usuario (auth.uid):</strong>{' '}
-            <code style={{ fontSize: '13px' }}>{user?.id}</code>
-          </li>
-          <li>
-            <strong>Email:</strong> {user?.email}
-          </li>
-          <li>
-            <strong>Confirmado:</strong>{' '}
-            {user?.email_confirmed_at ? 'Sí' : 'No (o no requerido)'}
-          </li>
-          <li>
-            <strong>Último acceso:</strong>{' '}
-            {user?.last_sign_in_at
-              ? new Date(user.last_sign_in_at).toLocaleString()
-              : 'Reciente'}
-          </li>
-        </ul>
-      </div>
-    </div>
+    </main>
   )
 }
