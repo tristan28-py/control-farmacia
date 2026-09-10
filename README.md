@@ -1,9 +1,9 @@
 # Control Farmacia
 
 Aplicación de control personal de tratamientos construida con React, Vite,
-JavaScript y Supabase. Esta entrega se limita a la **fase 1: autenticación**.
+JavaScript y Supabase. Implementa autenticación (fase 1) y perfiles con RLS (fase 2).
 
-## Funciones de esta fase
+## Autenticación (fase 1)
 
 - Registro por correo y contraseña, con nombre opcional.
 - Inicio y cierre de sesión.
@@ -12,8 +12,11 @@ JavaScript y Supabase. Esta entrega se limita a la **fase 1: autenticación**.
 - Confirmación visible del cambio de contraseña antes de continuar.
 - Mensajes en español, validación de contraseñas y bloqueo de solicitudes repetidas.
 
-El nombre se guarda en los metadatos de Supabase Auth. Todavía no se crea una
-tabla `profiles`, ni tablas de tratamientos, ni funciones de las fases siguientes.
+El registro proporciona el nombre inicial mediante metadata de Supabase Auth. La fase 2 lo guarda en `profiles` y permite editarlo desde la cuenta.
+
+## Perfiles y seguridad (fase 2)
+
+Aplica la migración SQL antes de usar el perfil. Consulta [la guía de fase 2](docs/FASE_2.md) para crear la tabla, verificar RLS y probar con dos usuarios. El SQL está preparado y probado localmente; requiere ejecución en tu proyecto remoto.
 
 ## Ejecutar el proyecto
 
@@ -91,15 +94,14 @@ La recuperación termina al pulsar **Continuar a mi cuenta**, después del éxit
 el alcance `local`: cierra la sesión de este navegador y sus pestañas, sin cerrar
 las sesiones de otros dispositivos.
 
-La sesión del cliente permite presentar la interfaz. Cuando se incorporen datos
-privados, sus permisos deberán imponerse en PostgreSQL mediante RLS; ocultar una
-pantalla en React no sustituye esos permisos.
+La sesión del cliente permite presentar la interfaz. La migración de fase 2 protege los perfiles mediante privilegios y RLS en PostgreSQL; ocultar una pantalla en React no sustituye esos permisos.
 
 ## Verificación
 
 ```sh
 npm run lint
 npm run build
+npm run test:db
 npx playwright install chromium
 npm test
 ```

@@ -26,7 +26,7 @@ function MainContent() {
     return <AuthView key={isRecoveryMode ? 'recovery' : 'access'} />
   }
 
-  return <HomeView />
+  return <HomeView key={user.id} />
 }
 
 export default function App() {

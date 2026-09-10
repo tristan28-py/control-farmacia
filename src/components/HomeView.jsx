@@ -1,13 +1,15 @@
 import { useRef, useState } from 'react'
+import { ProfileForm } from './ProfileForm'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthErrorMessage } from '../lib/authMessages'
 
 export function HomeView() {
   const { user, signOut, authError } = useAuth()
+  const [profileName, setProfileName] = useState(null)
   const [busy, setBusy] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const requestPending = useRef(false)
-  const displayName = user?.user_metadata?.full_name?.trim() || user?.email?.split('@')[0] || 'Usuario'
+  const displayName = (profileName ?? user?.user_metadata?.full_name)?.trim() || user?.email?.split('@')[0] || 'Usuario'
 
   async function handleSignOut() {
     if (requestPending.current) return
@@ -39,16 +41,7 @@ export function HomeView() {
       {(errorMsg || authError) && (
         <p className="auth-alert auth-alert-error" role="alert">{errorMsg || authError}</p>
       )}
-      <section className="account-details" aria-labelledby="account-title">
-        <h2 id="account-title">Tu cuenta</h2>
-        <p>Has iniciado sesión. Puedes cerrar esta página y volver a acceder desde este navegador.</p>
-        <dl>
-          <dt>Correo electrónico</dt>
-          <dd>{user?.email}</dd>
-          <dt>Correo confirmado</dt>
-          <dd>{user?.email_confirmed_at ? 'Sí' : 'Pendiente de confirmación'}</dd>
-        </dl>
-      </section>
+      <ProfileForm onProfileChange={setProfileName} />
     </main>
   )
 }

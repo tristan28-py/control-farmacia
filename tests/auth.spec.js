@@ -1,53 +1,5 @@
 import { test, expect } from '@playwright/test'
-
-const user = {
-  id: '11111111-1111-4111-8111-111111111111',
-  aud: 'authenticated',
-  role: 'authenticated',
-  email: 'prueba@example.com',
-  email_confirmed_at: '2026-09-01T12:00:00Z',
-  created_at: '2026-09-01T12:00:00Z',
-  app_metadata: { provider: 'email', providers: ['email'] },
-  user_metadata: { full_name: 'Persona de prueba' },
-}
-const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url')
-const accessToken = [
-  encode({ alg: 'HS256', typ: 'JWT' }),
-  encode({ sub: user.id, aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 }),
-  'test-signature',
-].join('.')
-const session = { access_token: accessToken, refresh_token: 'test-refresh', token_type: 'bearer', expires_in: 3600, user }
-
-// La biblioteca real de Supabase se ejecuta; solo simulamos sus respuestas HTTP.
-async function mockAuth(context, overrides = {}) {
-  const requests = []
-  await context.route('https://**.supabase.co/**', async (route) => {
-    const url = new URL(route.request().url())
-    expect(url.hostname).toBe('auth-test.supabase.co')
-    const operation = url.pathname.split('/').pop()
-    requests.push({ operation, url, body: route.request().postDataJSON() })
-    if (overrides[operation]) return overrides[operation](route)
-    if (operation === 'token') return route.fulfill({ json: session })
-    if (operation === 'user' || operation === 'signup') return route.fulfill({ json: user })
-    if (operation === 'recover' || operation === 'logout') return route.fulfill({ json: {} })
-    throw new Error('Solicitud de autenticación inesperada: ' + operation)
-  })
-  return requests
-}
-
-async function login(page) {
-  await page.goto('/')
-  await page.getByLabel('Correo electrónico', { exact: true }).fill(user.email)
-  await page.getByLabel('Contraseña', { exact: true }).fill('Prueba-segura-123')
-  await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Hola, Persona de prueba' })).toBeVisible()
-}
-
-async function openRecovery(page, query = '?auth=recovery') {
-  await page.goto('/' + query + '#access_token=' + accessToken +
-    '&refresh_token=test-refresh&token_type=bearer&expires_in=3600&type=recovery')
-  await expect(page.getByRole('heading', { name: 'Nueva contraseña', exact: true })).toBeVisible()
-}
+import { user, session, mockAuth, login, openRecovery } from './helpers/auth'
 
 test('muestra errores de acceso en español y permite reintentar', async ({ page, context }) => {
   await mockAuth(context, {

@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:db": "node --test tests/database/*.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -16,6 +17,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@types/react": "^19.2.18",
