@@ -141,3 +141,14 @@ Referencias oficiales:
 [recuperación de contraseña](https://supabase.com/docs/reference/javascript/auth-resetpasswordforemail),
 [eventos de autenticación](https://supabase.com/docs/reference/javascript/auth-onauthstatechange) y
 [direcciones de retorno](https://supabase.com/docs/guides/auth/redirect-urls).
+
+## Diseño de la interfaz
+
+El acceso y el perfil comparten una identidad en verde petróleo y menta, con
+iconos médicos y un motivo decorativo de pulso. El botón del pie permite pausar
+las animaciones; también se respeta la preferencia de movimiento reducido del
+dispositivo. El tema se adapta al modo claro u oscuro del sistema.
+
+Las fuentes DM Sans y Manrope se sirven localmente. Sus licencias OFL están en
+`src/assets/fonts`. `npm test` incluye comprobaciones de móvil, texto ampliado,
+navegación por teclado y el control de animaciones.

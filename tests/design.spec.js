@@ -1,0 +1,61 @@
+import { test, expect } from '@playwright/test'
+import { mockAuth, login } from './helpers/auth'
+
+test('presentación de acceso y perfil en escritorio, móvil y oscuro', async ({ page, context }, testInfo) => {
+  const errors = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()) })
+  await mockAuth(context)
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Iniciar sesión', exact: true })).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  await page.screenshot({ path: testInfo.outputPath('acceso-escritorio.png'), fullPage: true, animations: 'disabled' })
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({ path: testInfo.outputPath('acceso-movil.png'), fullPage: true, animations: 'disabled' })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.getByRole('button', { name: 'Crear cuenta', exact: true }).click()
+  await page.screenshot({ path: testInfo.outputPath('registro-movil.png'), fullPage: true, animations: 'disabled' })
+
+  await login(page)
+  await expect(page.getByLabel('Nombre completo', { exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await page.screenshot({ path: testInfo.outputPath('perfil-escritorio.png'), fullPage: true, animations: 'disabled' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('perfil-movil.png'), fullPage: true, animations: 'disabled' })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.screenshot({ path: testInfo.outputPath('perfil-oscuro.png'), fullPage: true, animations: 'disabled' })
+  expect(errors).toEqual([])
+})
+
+test('respeta movimiento reducido y permite pausar las animaciones médicas', async ({ page, context }) => {
+  await mockAuth(context)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  const animation = () => page.locator('.pulse-trace').first().evaluate((element) => getComputedStyle(element).animationName)
+  await expect(page.getByRole('button', { name: 'Activar animaciones' })).toHaveAttribute('aria-pressed', 'false')
+  expect(await animation()).toBe('none')
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await expect(page.getByRole('button', { name: 'Pausar animaciones' })).toHaveAttribute('aria-pressed', 'true')
+  expect(await animation()).toBe('pulse-draw')
+  await page.getByRole('button', { name: 'Pausar animaciones' }).click()
+  expect(await animation()).toBe('none')
+  await page.getByRole('button', { name: 'Activar animaciones' }).click()
+  expect(await animation()).toBe('pulse-draw')
+})
+
+test('acceso usable con texto al 200 por ciento y navegación por teclado', async ({ page, context }, testInfo) => {
+  await mockAuth(context)
+  await page.setViewportSize({ width: 360, height: 800 })
+  await page.goto('/')
+  await page.addStyleTag({ content: 'html { font-size: 32px !important; }' })
+  await expect(page.getByRole('button', { name: 'Iniciar sesión', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'Saltar al contenido' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#contenido')).toBeFocused()
+  await page.screenshot({ path: testInfo.outputPath('texto-ampliado.png'), fullPage: true, animations: 'disabled' })
+})

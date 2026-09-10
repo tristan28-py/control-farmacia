@@ -1,3 +1,4 @@
+import { MedicalIcon } from './MedicalIcon'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
@@ -103,9 +104,9 @@ export function ProfileForm({ onProfileChange }) {
 
   return (
     <section className="account-details" aria-labelledby="profile-title">
-      <h2 id="profile-title">Tu cuenta</h2>
+      <div className="profile-heading"><span className="profile-avatar"><MedicalIcon name="user" /></span><div><h2 id="profile-title">Tu cuenta</h2><p>Los detalles que te hacen tú.</p></div></div>
       <dl>
-        <dt>Correo electrónico</dt>
+        <dt><MedicalIcon name="mail" /> Correo electrónico</dt>
         <dd>{user.email}</dd>
       </dl>
 

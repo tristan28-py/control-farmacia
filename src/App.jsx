@@ -1,3 +1,5 @@
+import { SiteFrame } from './components/SiteFrame'
+import { MedicalIcon } from './components/MedicalIcon'
 import { AuthProvider } from './context/AuthProvider'
 import { useAuth } from './hooks/useAuth'
 import { AuthView } from './components/auth/AuthView'
@@ -10,7 +12,7 @@ function MainContent() {
 
   if (!isSupabaseConfigured) {
     return (
-      <main className="auth-container">
+      <main className="auth-container" id="contenido" tabIndex={-1}>
         <h1>Acceso no disponible</h1>
         <p role="alert">El acceso a las cuentas no está disponible en este momento. Inténtalo más tarde.</p>
       </main>
@@ -18,7 +20,7 @@ function MainContent() {
   }
 
   if (loading) {
-    return <main className="session-loading" role="status">Cargando sesión…</main>
+    return <main className="session-loading" id="contenido" tabIndex={-1} role="status"><span className="brand-symbol"><MedicalIcon /></span>Cargando sesión…</main>
   }
 
   if (isRecoveryMode || !user) {
@@ -30,5 +32,5 @@ function MainContent() {
 }
 
 export default function App() {
-  return <AuthProvider><MainContent /></AuthProvider>
+  return <AuthProvider><SiteFrame><MainContent /></SiteFrame></AuthProvider>
 }

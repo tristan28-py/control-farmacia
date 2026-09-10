@@ -1,3 +1,5 @@
+import { MedicalIcon } from '../MedicalIcon'
+import { WellnessVisual } from '../WellnessVisual'
 import { useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { getAuthErrorMessage, MIN_PASSWORD_LENGTH } from '../../lib/authMessages'
@@ -106,9 +108,17 @@ export function AuthView() {
   }
 
   return (
-    <main className="auth-container">
+    <div className="auth-layout">
+      <aside className="wellness-panel" aria-label="Bienvenido a Control Farmacia">
+        <p className="eyebrow"><MedicalIcon name="pulse" /> Bienestar, todos los días</p>
+        <h2>Cuidarte empieza<br />por <em>ti.</em></h2>
+        <p className="wellness-description">Un espacio personal, sencillo y cercano. Porque tu bienestar merece un lugar en tu día.</p>
+        <WellnessVisual />
+        <div className="wellness-bottom"><MedicalIcon name="heart" /><p><strong>Pequeños pasos, más tranquilidad.</strong>Siempre a tu ritmo.</p></div>
+      </aside>
+      <main className="auth-container" id="contenido" tabIndex={-1}>
       <header className="auth-header">
-        <p className="auth-brand">Control Farmacia</p>
+        <p className="auth-brand"><MedicalIcon name="user" /> Tu espacio personal</p>
         <h1>{passwordUpdated ? 'Contraseña actualizada' : titles[mode]}</h1>
         <p>{mode === 'forgot' ? 'Te enviaremos un enlace para elegir una nueva contraseña.' :
           mode === 'recovery' ? 'Elige una contraseña que no uses en otras cuentas.' :
@@ -123,7 +133,7 @@ export function AuthView() {
       {passwordUpdated ? (
         <button className="btn-primary" type="button" onClick={finishRecovery}>Continuar a mi cuenta</button>
       ) : (
-        <form onSubmit={handleSubmit} aria-label={titles[mode]} aria-busy={busy}>
+        <form key={mode} onSubmit={handleSubmit} aria-label={titles[mode]} aria-busy={busy}>
           <fieldset className="auth-form" disabled={busy}>
             <legend className="sr-only">{titles[mode]}</legend>
             {mode === 'register' && (
@@ -180,6 +190,8 @@ export function AuthView() {
           </fieldset>
         </form>
       )}
-    </main>
+      <p className="auth-footnote"><MedicalIcon name="heart" /> Un pequeño paso para cuidar de ti.</p>
+      </main>
+    </div>
   )
 }
