@@ -1,9 +1,8 @@
 import { MedicalIcon } from './MedicalIcon'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../lib/supabase'
-
-const profileColumns = 'id, full_name, created_at, updated_at'
+import { getProfile, updateProfile } from '../services/profileService'
+import { getDataErrorMessage } from '../lib/errorMessages'
 
 export function ProfileForm({ onProfileChange }) {
   const { user } = useAuth()
@@ -21,24 +20,15 @@ export function ProfileForm({ onProfileChange }) {
 
     async function loadProfile() {
       try {
-        const { data, error } = await supabase.from('profiles')
-          .select(profileColumns)
-          .eq('id', user.id)
-          .abortSignal(controller.signal)
-          .maybeSingle()
+        const data = await getProfile(user.id, controller.signal)
 
         if (controller.signal.aborted) return
-        if (error) throw error
-        if (!data) {
-          setErrorMsg('Tu perfil todavía no está disponible. Intenta de nuevo o contacta con soporte.')
-          return
-        }
         setProfile(data)
         setFullName(data.full_name ?? '')
         onProfileChange(data.full_name ?? '')
-      } catch {
+      } catch (error) {
         if (!controller.signal.aborted) {
-          setErrorMsg('No pudimos cargar tu perfil. Revisa tu conexión e inténtalo de nuevo.')
+          setErrorMsg(getDataErrorMessage(error, 'load'))
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false)
@@ -74,30 +64,19 @@ export function ProfileForm({ onProfileChange }) {
     saveRequest.current = controller
     setSaving(true)
     try {
-      // El id procede de Auth; solo se envía el campo editable.
-      // RLS vuelve a comprobar la identidad en PostgreSQL.
-      const { data, error } = await supabase.from('profiles')
-        .update({ full_name: name || null })
-        .eq('id', user.id)
-        .select(profileColumns)
-        .abortSignal(controller.signal)
-        .single()
+      const data = await updateProfile(user.id, name, controller.signal)
 
       if (controller.signal.aborted) return
-      if (error || !data) {
-        setErrorMsg('No pudimos guardar tu perfil. Tus cambios siguen aquí para que puedas reintentarlo.')
-        return
-      }
       setProfile(data)
       setFullName(data.full_name ?? '')
       onProfileChange(data.full_name ?? '')
       setSuccessMsg('Tu perfil se guardó correctamente.')
-    } catch {
+    } catch (error) {
       if (!controller.signal.aborted) {
-        setErrorMsg('No pudimos guardar tu perfil. Tus cambios siguen aquí para que puedas reintentarlo.')
+        setErrorMsg(getDataErrorMessage(error, 'save'))
       }
     } finally {
-      saveRequest.current = null
+      if (saveRequest.current === controller) saveRequest.current = null
       if (!controller.signal.aborted) setSaving(false)
     }
   }

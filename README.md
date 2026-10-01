@@ -1,7 +1,8 @@
 # Control Farmacia
 
 Aplicación de control personal de tratamientos construida con React, Vite,
-JavaScript y Supabase. Implementa autenticación (fase 1) y perfiles con RLS (fase 2).
+JavaScript y Supabase. Implementa autenticación (fase 1), perfiles con RLS (fase 2)
+y endurecimiento y preparación arquitectónica (fase 2.5).
 
 ## Autenticación (fase 1)
 
@@ -84,10 +85,43 @@ la política de contraseñas, las direcciones autorizadas ni el servicio de corr
 | `src/components/auth/AuthView.jsx` | Formularios de acceso y recuperación. |
 | `src/components/HomeView.jsx` | Cuenta activa y cierre de sesión con manejo de errores. |
 
+## Arquitectura de la fase 2.5
+
+- `src/main.jsx`: StrictMode y Error Boundary global. Un fallo inesperado de render
+  muestra «Algo salió mal» con opción de recarga, sin detalles internos.
+- `src/App.jsx`: decide entre configuración no disponible, carga, autenticación,
+  recuperación y entrada autenticada. Reinicia la cuenta con `key={user.id}`.
+- `src/components/HomeView.jsx`: entrada autenticada actual, saludo y cierre de sesión.
+  Sigue siendo una pantalla de cuenta; todavía no hay dashboard ni navegación.
+- `src/components/ProfileForm.jsx`: carga, borrador, reintento y guardado. Cancela
+  solicitudes al desmontar y descarta resultados cancelados.
+- `src/services/profileService.js`: única ubicación de consultas de perfiles,
+  columnas solicitadas, `trim`, vacío a `null` y actualización solo de `full_name`.
+  Recibe identidad y `AbortSignal`; no mantiene estado de UI ni reemplaza RLS.
+- `src/lib/errorMessages.js`: mensajes seguros para fallos de datos, distinguiendo
+  conexión, sesión, permisos, indisponibilidad y perfil ausente. No muestra mensajes
+  internos de PostgreSQL. `authMessages.js` conserva los códigos específicos de Auth.
+- `src/hooks/useMotionPreference.js`: preferencia local de movimiento con prioridad
+  para la reducción solicitada por el sistema, incluso si el almacenamiento falla.
+- `src/components/auth/PasswordInput.jsx`: mostrar/ocultar contraseña accesible.
+
+CSS normal: `src/index.css` contiene fuentes, tokens, base y estructura global;
+`src/components/auth/auth.css` mantiene acceso y primitivas visuales compartidas;
+`src/components/account.css` agrupa cuenta y perfil. Se conserva la cascada y el tema
+oscuro del sistema. No se incorporan router, gestor de estado ni dependencias nuevas.
+
+Las futuras operaciones de datos deben añadirse como servicios concretos, evitando
+consultas en componentes. Auth continúa centralizado en `AuthProvider`.
+
 `INITIAL_SESSION` restaura la sesión y los eventos posteriores la mantienen
 sincronizada. `PASSWORD_RECOVERY` abre el cambio de contraseña. El marcador
 `?auth=recovery` conserva esa pantalla al recargar, pero no concede una sesión:
 la actualización requiere que Supabase autentique al usuario.
+
+Se conserva `supabase.auth.initialize()` para observar errores del procesamiento de
+enlaces: en la versión fijada 2.116.0 reutiliza la promesa de inicialización automática.
+No realiza una segunda lectura independiente de sesión. El listener se desuscribe
+al desmontar, también durante la comprobación de efectos de StrictMode.
 
 La recuperación termina al pulsar **Continuar a mi cuenta**, después del éxito.
 **Cancelar y cerrar sesión** descarta la sesión de recuperación. El cierre usa
@@ -105,6 +139,27 @@ npm run test:db
 npx playwright install chromium
 npm test
 ```
+
+Después de instalar Chromium, todas las comprobaciones se pueden ejecutar con:
+
+```sh
+npm run check
+```
+
+`check` ejecuta lint, build, PGlite y Playwright en ese orden y se detiene ante un
+fallo. `tests/hardening.spec.js` añade regresiones de configuración inválida, errores
+de render, metadata no textual, movimiento persistente, visibilidad de contraseña,
+errores de red/sesión/permisos, solicitudes canceladas al cambiar de usuario,
+eventos repetidos de Auth, enlaces inválidos y límites del servicio de perfiles.
+
+### Integración continua
+
+`.github/workflows/ci.yml` se ejecuta en pushes y pull requests con Node.js 24:
+instala mediante `npm ci`, instala Chromium y sus dependencias, y ejecuta `npm run check`.
+Utiliza URL y clave públicas ficticias; Playwright intercepta las respuestas de
+Supabase. No requiere secretos ni acceso al proyecto de producción. Cuando falla,
+conserva los resultados de Playwright durante siete días. La ejecución remota del
+workflow se comprueba en la pestaña Actions de GitHub después del push.
 
 En Windows puedes usar Edge ya instalado sin descargar Chromium:
 
@@ -146,8 +201,9 @@ Referencias oficiales:
 
 El acceso y el perfil comparten una identidad en verde petróleo y menta, con
 iconos médicos y un motivo decorativo de pulso. El botón del pie permite pausar
-las animaciones; también se respeta la preferencia de movimiento reducido del
-dispositivo. El tema se adapta al modo claro u oscuro del sistema.
+las animaciones y guarda esa elección localmente. La preferencia de movimiento
+reducido del dispositivo tiene prioridad y deshabilita el control mientras esté
+activa, sin borrar la elección manual. El tema se adapta al modo claro u oscuro del sistema.
 
 Las fuentes DM Sans y Manrope se sirven localmente. Sus licencias OFL están en
 `src/assets/fonts`. `npm test` incluye comprobaciones de móvil, texto ampliado,

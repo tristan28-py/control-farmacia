@@ -11,7 +11,9 @@ export function HomeView() {
   const [busy, setBusy] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const requestPending = useRef(false)
-  const displayName = (profileName ?? user?.user_metadata?.full_name)?.trim() || user?.email?.split('@')[0] || 'Usuario'
+  const metadataName = user?.user_metadata?.full_name
+  const displayName = (profileName ?? (typeof metadataName === 'string' ? metadataName : ''))
+    .trim() || user?.email?.split('@')[0] || 'Usuario'
 
   async function handleSignOut() {
     if (requestPending.current) return

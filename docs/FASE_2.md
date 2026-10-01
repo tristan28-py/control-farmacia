@@ -154,8 +154,10 @@ en el proyecto remoto.
 
 ## Archivos principales
 
-- `src/components/ProfileForm.jsx`: consulta con `user.id`, estados de carga,
-  formulario y guardado únicamente de `full_name`.
+- `src/components/ProfileForm.jsx`: estados de carga, formulario, borrador y
+  cancelación de solicitudes. Desde fase 2.5 delega consultas al servicio.
+- `src/services/profileService.js`: consulta con `user.id` y guardado únicamente
+  de `full_name`; normalización del nombre y errores de datos sin detalles internos.
 - `src/components/HomeView.jsx`: integra el perfil y actualiza el saludo al guardar.
 - `src/App.jsx`: reinicia la vista al cambiar el usuario autenticado; las
   solicitudes anteriores se cancelan para no mostrar datos de otra cuenta.

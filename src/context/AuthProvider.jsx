@@ -39,7 +39,8 @@ export function AuthProvider({ children }) {
       // USER_UPDATED no termina la recuperación: primero mostramos la confirmación.
     })
 
-    // initialize() reutiliza la inicialización y permite mostrar sus errores.
+    // En auth-js 2.116 initialize() reutiliza initializePromise. Observamos sus errores
+    // de enlace; INITIAL_SESSION sigue siendo la única lectura inicial de sesión.
     supabase.auth.initialize().then(({ error }) => {
       if (active && error) {
         setAuthError(authRedirect.recovery || authRedirect.error

@@ -1,5 +1,6 @@
 import { MedicalIcon } from '../MedicalIcon'
 import { WellnessVisual } from '../WellnessVisual'
+import { PasswordInput } from './PasswordInput'
 import { useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { getAuthErrorMessage, MIN_PASSWORD_LENGTH } from '../../lib/authMessages'
@@ -33,6 +34,7 @@ export function AuthView() {
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [passwordUpdated, setPasswordUpdated] = useState(false)
+  const [invalidField, setInvalidField] = useState('')
   const createsPassword = mode === 'register' || mode === 'recovery'
 
   function changeMode(nextMode) {
@@ -43,6 +45,7 @@ export function AuthView() {
     clearAuthError()
     setPassword('')
     setConfirmPassword('')
+    setInvalidField('')
   }
 
   async function handleSubmit(event) {
@@ -51,13 +54,18 @@ export function AuthView() {
     setErrorMsg('')
     setSuccessMsg('')
     clearAuthError()
+    setInvalidField('')
 
     if (createsPassword && password.length < MIN_PASSWORD_LENGTH) {
       setErrorMsg(`Usa al menos ${MIN_PASSWORD_LENGTH} caracteres para la contraseña.`)
+      setInvalidField('password')
+      event.currentTarget.elements.namedItem('password').focus()
       return
     }
     if (createsPassword && password !== confirmPassword) {
       setErrorMsg('Las contraseñas no coinciden.')
+      setInvalidField('confirmPassword')
+      event.currentTarget.elements.namedItem('confirmPassword').focus()
       return
     }
 
@@ -126,7 +134,7 @@ export function AuthView() {
       </header>
 
       {(errorMsg || authError) && (
-        <div className="auth-alert auth-alert-error" role="alert">{errorMsg || authError}</div>
+        <div id="auth-error" className="auth-alert auth-alert-error" role="alert">{errorMsg || authError}</div>
       )}
       {successMsg && <div className="auth-alert auth-alert-success" role="status">{successMsg}</div>}
 
@@ -156,9 +164,10 @@ export function AuthView() {
             {mode !== 'forgot' && (
               <div className="form-group">
                 <label htmlFor="password">{mode === 'recovery' ? 'Nueva contraseña' : 'Contraseña'}</label>
-                <input id="password" name="password" type="password" required
+                <PasswordInput id="password" name="password" required
                   autoComplete={createsPassword ? 'new-password' : 'current-password'}
-                  aria-describedby={createsPassword ? 'password-hint' : undefined}
+                  aria-invalid={invalidField === 'password' || undefined}
+                  aria-describedby={invalidField === 'password' ? 'password-hint auth-error' : createsPassword ? 'password-hint' : undefined}
                   value={password} onChange={(event) => setPassword(event.target.value)} />
                 {createsPassword && <p id="password-hint" className="form-hint">Al menos {MIN_PASSWORD_LENGTH} caracteres. Usa una contraseña larga y única.</p>}
               </div>
@@ -167,7 +176,9 @@ export function AuthView() {
             {createsPassword && (
               <div className="form-group">
                 <label htmlFor="confirm-password">Confirmar contraseña</label>
-                <input id="confirm-password" name="confirmPassword" type="password" required
+                <PasswordInput id="confirm-password" name="confirmPassword" required
+                  aria-invalid={invalidField === 'confirmPassword' || undefined}
+                  aria-describedby={invalidField === 'confirmPassword' ? 'auth-error' : undefined}
                   autoComplete="new-password" value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)} />
               </div>

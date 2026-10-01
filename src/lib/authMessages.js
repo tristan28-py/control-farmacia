@@ -1,3 +1,5 @@
+import { connectionMessage } from './errorMessages'
+
 export const MIN_PASSWORD_LENGTH = 8
 
 const messages = {
@@ -20,7 +22,7 @@ export function getAuthErrorMessage(error) {
   if (error?.status === 429) return messages.over_request_rate_limit
   if (error?.name === 'AuthSessionMissingError') return messages.session_not_found
   if (error?.name === 'AuthRetryableFetchError' || error instanceof TypeError) {
-    return 'No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.'
+    return connectionMessage
   }
   return 'No pudimos completar la solicitud. Inténtalo de nuevo.'
 }

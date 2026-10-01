@@ -6,6 +6,7 @@ import { AuthView } from './components/auth/AuthView'
 import { HomeView } from './components/HomeView'
 import { isSupabaseConfigured } from './lib/supabase'
 import './components/auth/auth.css'
+import './components/account.css'
 
 function MainContent() {
   const { user, loading, isRecoveryMode } = useAuth()

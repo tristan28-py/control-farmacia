@@ -1,16 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useMotionPreference } from '../hooks/useMotionPreference'
 import { MedicalIcon } from './MedicalIcon'
 
 export function SiteFrame({ children }) {
-  const [motionEnabled, setMotionEnabled] = useState(() =>
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-
-  useEffect(() => {
-    const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const updatePreference = (event) => setMotionEnabled(!event.matches)
-    preference.addEventListener('change', updatePreference)
-    return () => preference.removeEventListener('change', updatePreference)
-  }, [])
+  const { motionEnabled, reduced, toggleMotion } = useMotionPreference()
 
   return (
     <div className="site-shell" data-motion={motionEnabled ? 'on' : 'paused'}>
@@ -26,7 +18,8 @@ export function SiteFrame({ children }) {
       <footer className="site-footer">
         <p>Tu bienestar, a tu ritmo.</p>
         <button className="motion-toggle" type="button" aria-pressed={motionEnabled}
-          onClick={() => setMotionEnabled((enabled) => !enabled)}>
+          disabled={reduced} title={reduced ? 'El sistema solicita reducir el movimiento' : undefined}
+          onClick={toggleMotion}>
           <MedicalIcon name={motionEnabled ? 'pause' : 'play'} />
           {motionEnabled ? 'Pausar animaciones' : 'Activar animaciones'}
         </button>
